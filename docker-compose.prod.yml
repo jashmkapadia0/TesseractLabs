@@ -68,6 +68,7 @@ services:
       args:
         - VITE_API_URL=${VITE_API_URL}
         - VITE_RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID}
+        - VITE_WHATSAPP_NUMBER=${WHATSAPP_NUMBER}
     container_name: 3dlab-frontend-prod
     restart: always
     expose:

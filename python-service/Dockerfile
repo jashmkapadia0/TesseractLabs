@@ -23,5 +23,5 @@ RUN mkdir -p uploads
 # Expose port
 EXPOSE 5001
 
-# Run the application
-CMD ["python", "app.py"]
+# Run the application using gunicorn for production
+CMD ["gunicorn", "--bind", "0.0.0.0:5001", "--workers", "4", "app:app"]
