@@ -1,0 +1,89 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: 3dlab-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - 3dlab-network
+    environment:
+      - MONGO_INITDB_DATABASE=3dlab
+
+  python-service:
+    build:
+      context: ./python-service
+      dockerfile: Dockerfile
+    container_name: 3dlab-python-service
+    restart: unless-stopped
+    ports:
+      - "5001:5001"
+    volumes:
+      - ./python-service:/app
+      - python_uploads:/app/uploads
+    networks:
+      - 3dlab-network
+    environment:
+      - FLASK_ENV=development
+      - FLASK_PORT=5001
+      - FILAMENT_DENSITY=1.24
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: 3dlab-backend
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./backend:/app
+      - backend_uploads:/app/uploads
+      - /app/node_modules
+    networks:
+      - 3dlab-network
+    environment:
+      - NODE_ENV=development
+      - PORT=5000
+      - MONGO_URI=mongodb://mongodb:27017/3dlab
+      - PYTHON_SERVICE_URL=http://python-service:5001
+      - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID}
+      - RAZORPAY_SECRET=${RAZORPAY_SECRET}
+      - WHATSAPP_NUMBER=${WHATSAPP_NUMBER:-917069315037}
+      - COST_PER_GRAM=0.5
+      - HOURLY_RATE=100
+    depends_on:
+      - mongodb
+      - python-service
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: 3dlab-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      - 3dlab-network
+    environment:
+      - VITE_API_URL=http://localhost:5000
+      - VITE_RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID}
+    depends_on:
+      - backend
+
+networks:
+  3dlab-network:
+    driver: bridge
+
+volumes:
+  mongodb_data:
+  python_uploads:
+  backend_uploads:
