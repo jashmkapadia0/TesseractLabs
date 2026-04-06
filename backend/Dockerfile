@@ -18,4 +18,4 @@ RUN mkdir -p uploads
 EXPOSE 5000
 
 # Start application
-CMD ["npm", "run", "dev"]
+CMD ["npm", "start"]

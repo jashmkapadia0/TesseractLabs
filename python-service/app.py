@@ -192,4 +192,5 @@ def internal_error(error):
 
 if __name__ == '__main__':
     port = int(os.getenv('FLASK_PORT', 5001))
-    app.run(host='0.0.0.0', port=port, debug=True)
+    debug_mode = os.getenv('FLASK_ENV') != 'production'
+    app.run(host='0.0.0.0', port=port, debug=debug_mode)
