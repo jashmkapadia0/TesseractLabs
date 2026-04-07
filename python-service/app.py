@@ -196,7 +196,9 @@ def analyze_model():
             
             # Save GLB for preview
             converted_glb_url = None
-            host = os.getenv('PYTHON_SERVICE_URL', 'http://localhost:5001')
+            
+            # Use EXTERNAL_API_URL if this is running in production, else fallback to localhost
+            host = os.getenv('EXTERNAL_API_URL', 'http://localhost:5000')
             
             if glb_bytes_for_preview is not None:
                 # Already have GLB bytes from cascadio STEP conversion
