@@ -56,9 +56,39 @@ services:
       - WHATSAPP_NUMBER=${WHATSAPP_NUMBER:-917069315037}
       - COST_PER_GRAM=0.5
       - HOURLY_RATE=100
+      - REDIS_URL=redis://redis:6379/0
     depends_on:
       - mongodb
       - python-service
+      - redis
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: 3dlab-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - 3dlab-network
+
+  celery-worker:
+    build:
+      context: ./python-service
+      dockerfile: Dockerfile
+    container_name: 3dlab-celery-worker
+    restart: unless-stopped
+    command: ["celery", "-A", "celery_worker.celery_app", "worker", "--loglevel=info"]
+    volumes:
+      - ./python-service:/app
+      - python_uploads:/app/uploads
+    networks:
+      - 3dlab-network
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - MONGO_URI=mongodb://mongodb:27017/3dlab
+    depends_on:
+      - redis
+      - mongodb
 
   frontend:
     build:

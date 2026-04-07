@@ -81,8 +81,8 @@ mongoose.connect(MONGO_URI)
         console.log('✅ Connected to MongoDB');
     })
     .catch((err) => {
-        console.error('❌ MongoDB connection error:', err);
-        process.exit(1);
+        console.error('⚠️  MongoDB connection error (server will still start):', err.message);
+        // Non-fatal — server starts anyway; order-saving routes will fail gracefully
     });
 
 // Start server

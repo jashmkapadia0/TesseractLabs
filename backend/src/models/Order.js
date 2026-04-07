@@ -40,6 +40,13 @@ const orderSchema = new mongoose.Schema({
     machineTimeEstimate: {
         type: Number,
         default: 0
+    },
+    material: String,
+    color: String,
+    infill: Number,
+    qty: {
+        type: Number,
+        default: 1
     }
 }, {
     timestamps: true

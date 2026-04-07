@@ -4,7 +4,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 const api = axios.create({
     baseURL: API_URL,
-    timeout: 60000, // 60 second timeout for file uploads
+    timeout: 180000, // 180 second timeout for file uploads (STEP conversion is slow)
     headers: {
         'Content-Type': 'application/json',
     }
@@ -64,8 +64,8 @@ export const uploadModel = async (file, onProgress) => {
     return response.data;
 };
 
-export const createRazorpayOrder = async (orderId) => {
-    const response = await api.post('/api/razorpay/create-order', { orderId });
+export const createRazorpayOrder = async (orderId, configuredPrice, options) => {
+    const response = await api.post('/api/razorpay/create-order', { orderId, configuredPrice, options });
     return response.data;
 };
 

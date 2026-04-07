@@ -4,9 +4,10 @@ import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js'
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js'
 import { ThreeMFLoader } from 'three/examples/jsm/loaders/3MFLoader.js'
 import { PLYLoader } from 'three/examples/jsm/loaders/PLYLoader.js'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 
-export default function ModelViewer({ file, onError }) {
+export default function ModelViewer({ file, convertedGlbUrl, onError, uploadComplete }) {
   const containerRef = useRef(null)
   const sceneRef = useRef(null)
   const rendererRef = useRef(null)
@@ -18,9 +19,9 @@ export default function ModelViewer({ file, onError }) {
     if (!file || !containerRef.current) return
 
     const ext = file.name.split('.').pop().toLowerCase()
-    const canRender = ['stl', 'obj', '3mf', 'ply'].includes(ext)
+    const canRenderDirectly = ['stl', 'obj', '3mf', 'ply'].includes(ext)
 
-    if (!canRender) {
+    if (!canRenderDirectly && !convertedGlbUrl) {
       setUnsupported(true)
       return
     }
@@ -55,8 +56,6 @@ export default function ModelViewer({ file, onError }) {
     controls.enableDamping = true
     controls.dampingFactor = 0.05
     controls.screenSpacePanning = false
-    controls.minDistance = 20
-    controls.maxDistance = 2000
     controlsRef.current = controls
 
     // Lighting
@@ -80,7 +79,9 @@ export default function ModelViewer({ file, onError }) {
 
     // Load Model
     let loader
-    if (ext === 'stl') {
+    if (convertedGlbUrl) {
+      loader = new GLTFLoader()
+    } else if (ext === 'stl') {
       loader = new STLLoader()
     } else if (ext === 'obj') {
       loader = new OBJLoader()
@@ -100,8 +101,14 @@ export default function ModelViewer({ file, onError }) {
       let geometry
       let mesh
 
-      if (ext === 'stl' || ext === 'ply') {
+      if (convertedGlbUrl && object.scene) {
+        mesh = object.scene
+        const box = new THREE.Box3().setFromObject(mesh)
+        const center = box.getCenter(new THREE.Vector3())
+        mesh.position.sub(center) // Center the object
+      } else if (ext === 'stl' || ext === 'ply') {
         geometry = object
+        geometry.computeVertexNormals()
         geometry.center()
         const material = new THREE.MeshPhongMaterial({
           color: 0x3b82f6,
@@ -125,6 +132,7 @@ export default function ModelViewer({ file, onError }) {
       const maxDim = Math.max(size.x, size.y, size.z)
       const fov = camera.fov * (Math.PI / 180)
       let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2))
+      if (cameraZ === 0 || isNaN(cameraZ) || !isFinite(cameraZ)) cameraZ = 300
       cameraZ *= 2.0
       camera.position.z = cameraZ
       camera.lookAt(0,0,0)
@@ -133,22 +141,28 @@ export default function ModelViewer({ file, onError }) {
       const helper = new THREE.BoxHelper(mesh, 0xffff00)
       scene.add(helper)
 
-      URL.revokeObjectURL(url)
+      if (url) URL.revokeObjectURL(url)
     }
 
     const onErrorLocal = (err) => {
       console.error('Error loading model:', err)
       setLoading(false)
       if (onError) onError('Failed to load 3D file for preview')
-      URL.revokeObjectURL(url)
+      if (url) URL.revokeObjectURL(url)
     }
 
-    const url = URL.createObjectURL(file)
-    loader.load(url, onLoad, undefined, onErrorLocal)
+    // Declare url before callbacks so revokeObjectURL works correctly
+    let url = convertedGlbUrl ? null : URL.createObjectURL(file)
+    if (convertedGlbUrl) {
+      loader.load(convertedGlbUrl, onLoad, undefined, onErrorLocal)
+    } else {
+      loader.load(url, onLoad, undefined, onErrorLocal)
+    }
 
     // Animation loop
+    let animating = true
     const animate = () => {
-      if (!rendererRef.current) return
+      if (!animating || !rendererRef.current) return
       requestAnimationFrame(animate)
       controls.update()
       renderer.render(scene, camera)
@@ -165,7 +179,9 @@ export default function ModelViewer({ file, onError }) {
     window.addEventListener('resize', handleResize)
 
     return () => {
+      animating = false
       window.removeEventListener('resize', handleResize)
+      if (url) URL.revokeObjectURL(url)
       if (containerRef.current && renderer?.domElement) {
         if (containerRef.current.contains(renderer.domElement)) {
            containerRef.current.removeChild(renderer.domElement)
@@ -175,19 +191,44 @@ export default function ModelViewer({ file, onError }) {
       controls?.dispose()
       rendererRef.current = null
     }
-  }, [file, onError])
+  }, [file, convertedGlbUrl, onError])
+
+  const ext = file ? file.name.split('.').pop().toLowerCase() : ''
+  const isStepFile = ['step', 'stp'].includes(ext)
 
   return (
     <div
-      className="w-full h-full rounded-lg overflow-hidden bg-dark-tertiary relative group"
-      style={{ minHeight: '500px' }}
+      className="w-full rounded-lg overflow-hidden bg-dark-tertiary relative group"
+      style={{ height: '500px' }}
     >
-      <div ref={containerRef} className="w-full h-full" />
+      {/* Canvas container — must have explicit height, not h-full with min-height parent */}
+      <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
       
       {unsupported && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-dark-tertiary text-gray-500 p-8 text-center">
-           <p className="text-xl font-bold mb-2 text-gray-400">Preview Unavailable</p>
-           <p className="text-sm">3D preview is not yet available for .{file.name.split('.').pop()} files, but you can still proceed with your order!</p>
+          {uploadComplete && isStepFile ? (
+            // Post-upload message for STEP: analysis done, preview just not available
+            <>
+              <div className="w-16 h-16 rounded-full bg-green-500/10 border border-green-500/30 flex items-center justify-center mb-4">
+                <svg className="w-8 h-8 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <p className="text-lg font-bold mb-2 text-green-400">Analysis Complete!</p>
+              <p className="text-sm text-gray-400">3D preview is not available for STEP files,<br/>but your file was analyzed successfully.<br/>You can proceed with your order below.</p>
+            </>
+          ) : (
+            // Pre-upload message for STEP: ask to upload
+            <>
+              <div className="w-16 h-16 rounded-full bg-blue-500/10 border border-blue-500/30 flex items-center justify-center mb-4">
+                <svg className="w-8 h-8 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+              </div>
+              <p className="text-lg font-bold mb-2 text-gray-300">Preview Unavailable</p>
+              <p className="text-sm">Click <span className="text-accent-primary font-semibold">"Analyze &amp; Get Quote"</span> to process this {ext.toUpperCase()} file.</p>
+            </>
+          )}
         </div>
       )}
 

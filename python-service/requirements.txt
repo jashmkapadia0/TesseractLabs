@@ -5,3 +5,8 @@ trimesh==4.0.10
 numpy==1.26.2
 werkzeug==3.0.1
 python-dotenv==1.0.0
+celery==5.3.6
+redis==5.0.1
+pymongo==4.6.1
+cascadio==0.0.14
+scipy==1.11.4

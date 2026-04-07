@@ -3,120 +3,24 @@ import { FaUpload, FaSpinner, FaCheckCircle, FaWhatsapp, FaCreditCard, FaInfoCir
 import ModelViewer from '../components/ModelViewer'
 import { uploadModel, createRazorpayOrder, verifyPayment, getOrder } from '../api/api'
 
-// ─── Full JLCPCB-style spec data ─────────────────────────────────────────────
-const TECH_OPTIONS = [
-  { id: 'FDM', label: 'FDM (Plastic)', desc: 'Cost-effective, wide compatibility', basePrice: 1.00 },
-  { id: 'SLA', label: 'SLA (Resin)', desc: 'High resolution, smooth surface', basePrice: 0.30 },
+const MATERIALS = [
+  { id: 'pla',  label: 'PLA Plastic', density: 1.24 },
+  { id: 'petg', label: 'PETG',        density: 1.27 },
+  { id: 'abs',  label: 'ABS Plastic', density: 1.04 },
+  { id: 'tpu',  label: 'TPU Plastic', density: 1.21 },
 ]
 
-const MATERIALS_BY_TECH = {
-  SLA: [
-    { id: 'grey_resin',       label: 'Grey Resin',          priceMultiplier: 1.0 },
-    { id: 'black_resin',      label: 'Black Resin',          priceMultiplier: 1.0 },
-    { id: 'jlc_black_resin',  label: 'JLC Black Resin',      priceMultiplier: 1.1 },
-    { id: '9600_resin',       label: '9600 Resin',           priceMultiplier: 1.15 },
-    { id: 'x_resin',          label: 'X Resin',              priceMultiplier: 1.2 },
-    { id: 'ledo_6060',        label: 'LEDO 6060 Resin',      priceMultiplier: 1.1 },
-    { id: 'cby_resin',        label: 'CBY Resin',            priceMultiplier: 1.05 },
-    { id: 'imagine_black',    label: 'Imagine Black Resin',  priceMultiplier: 1.15 },
-    { id: '8228_resin',       label: '8228 Resin',           priceMultiplier: 1.1 },
-    { id: '8001_resin',       label: '8001 Resin (Transparent)', priceMultiplier: 1.2 },
-    { id: '9000he_resin',     label: '9000HE Industrial Resin', priceMultiplier: 1.3 },
-  ],
-  MJF: [
-    { id: 'pa12_hp',   label: 'PA12-HP Nylon', priceMultiplier: 1.0 },
-    { id: 'pac_hp',    label: 'PAC-HP Nylon',  priceMultiplier: 1.1 },
-    { id: 'pa11_hp',   label: 'PA11-HP Nylon', priceMultiplier: 1.15 },
-  ],
-  SLM: [
-    { id: 'titanium',  label: 'Titanium TC4',         priceMultiplier: 1.5 },
-    { id: 'ss316l',    label: '316L Stainless Steel', priceMultiplier: 1.0 },
-  ],
-  FDM: [
-    { id: 'pla',       label: 'PLA Plastic',    priceMultiplier: 1.0 },
-    { id: 'abs',       label: 'ABS Plastic',    priceMultiplier: 1.1 },
-    { id: 'asa',       label: 'ASA Plastic',    priceMultiplier: 1.2 },
-    { id: 'pa12_cf',   label: 'PA12-CF Plastic',priceMultiplier: 1.4 },
-    { id: 'tpu',       label: 'TPU Plastic',    priceMultiplier: 1.3 },
-  ],
-  SLS: [
-    { id: '3301pa',    label: '3301PA Nylon',   priceMultiplier: 1.0 },
-    { id: '3201paf',   label: '3201PA-F Nylon', priceMultiplier: 1.05 },
-    { id: '1172pro',   label: '1172 Pro Nylon', priceMultiplier: 1.15 },
-    { id: '3401gb',    label: '3401GB Nylon',   priceMultiplier: 1.2 },
-  ],
-  WJP: [
-    { id: 'fullcolor_resin', label: 'Full-Color Resin', priceMultiplier: 1.0 },
-  ],
-  BJ: [
-    { id: 'bj_316l', label: 'BJ-316L Stainless Steel', priceMultiplier: 1.0 },
-  ],
-}
+const COLORS = [
+  { id: 'black',   label: 'Black',   hex: '#1a1a1a' },
+  { id: 'white',   label: 'White',   hex: '#f5f5f5' },
+  { id: 'grey',    label: 'Grey',    hex: '#888888' },
+  { id: 'red',     label: 'Red',     hex: '#e53e3e' },
+  { id: 'blue',    label: 'Blue',    hex: '#3b82f6' },
+  { id: 'green',   label: 'Green',   hex: '#22c55e' },
+  { id: 'yellow',  label: 'Yellow',  hex: '#facc15' },
+]
 
-const COLORS_BY_TECH = {
-  SLA: [
-    { id: 'natural', label: 'Natural / Default', hex: '#d4c9b0' },
-    { id: 'black',   label: 'Black',  hex: '#1a1a1a' },
-    { id: 'white',   label: 'White',  hex: '#f5f5f5' },
-    { id: 'grey',    label: 'Grey',   hex: '#888888' },
-    { id: 'clear',   label: 'Clear / Transparent', hex: '#c8e6ff', transparent: true },
-  ],
-  FDM: [
-    { id: 'black',   label: 'Black',   hex: '#1a1a1a' },
-    { id: 'white',   label: 'White',   hex: '#f5f5f5' },
-    { id: 'grey',    label: 'Grey',    hex: '#888888' },
-    { id: 'red',     label: 'Red',     hex: '#e53e3e' },
-    { id: 'blue',    label: 'Blue',    hex: '#3b82f6' },
-    { id: 'green',   label: 'Green',   hex: '#22c55e' },
-    { id: 'yellow',  label: 'Yellow',  hex: '#facc15' },
-    { id: 'orange',  label: 'Orange',  hex: '#f97316' },
-    { id: 'purple',  label: 'Purple',  hex: '#a855f7' },
-  ],
-  MJF: [
-    { id: 'natural', label: 'Natural (White/Grey)', hex: '#d4d4d4' },
-    { id: 'black',   label: 'Black (Dyed)',         hex: '#1a1a1a' },
-  ],
-  SLS: [
-    { id: 'natural', label: 'Natural (White)',  hex: '#f5f5f5' },
-    { id: 'black',   label: 'Black (Dyed)',     hex: '#1a1a1a' },
-  ],
-  SLM: [{ id: 'metal', label: 'Metal (Natural)', hex: '#aab0bc' }],
-  WJP: [{ id: 'fullcolor', label: 'Full Color (as modeled)', hex: 'gradient' }],
-  BJ:  [{ id: 'metal', label: 'Metal (Natural)', hex: '#aab0bc' }],
-}
 
-const SURFACE_FINISH_BY_TECH = {
-  SLA: [
-    { id: 'standard',       label: 'Standard (as printed)',       priceAdd: 0 },
-    { id: 'sanding',        label: 'Sanding',                     priceAdd: 2.0 },
-    { id: 'spray_painting', label: 'Spray Painting',              priceAdd: 5.0 },
-    { id: 'electroplating', label: 'Electroplating',              priceAdd: 8.0 },
-  ],
-  FDM: [
-    { id: 'standard', label: 'Standard (as printed)', priceAdd: 0 },
-    { id: 'sanding',  label: 'Sanding',               priceAdd: 2.0 },
-  ],
-  MJF: [
-    { id: 'standard',      label: 'Standard (as printed)', priceAdd: 0 },
-    { id: 'dyeing_black',  label: 'Dyeing (Black)',         priceAdd: 1.5 },
-  ],
-  SLS: [
-    { id: 'standard',     label: 'Standard (as printed)', priceAdd: 0 },
-    { id: 'dyeing_black', label: 'Dyeing (Black)',         priceAdd: 1.5 },
-  ],
-  SLM: [
-    { id: 'standard',      label: 'Standard (as printed)',  priceAdd: 0 },
-    { id: 'polishing',     label: 'Polishing',              priceAdd: 5.0 },
-    { id: 'sandblasting',  label: 'Sandblasting',           priceAdd: 4.0 },
-  ],
-  WJP: [{ id: 'standard', label: 'Standard (Full Color)', priceAdd: 0 }],
-  BJ:  [
-    { id: 'standard',      label: 'Standard (as printed)', priceAdd: 0 },
-    { id: 'sandblasting',  label: 'Sandblasting',          priceAdd: 4.0 },
-  ],
-}
-
-const USD_TO_INR = 84
 
 function SelectDropdown({ label, options, value, onChange, renderOption }) {
   const [open, setOpen] = useState(false)
@@ -159,38 +63,42 @@ export default function Upload() {
   const [processing, setProcessing] = useState(false)
 
   // Config state
-  const [technology, setTechnology] = useState('FDM')
-  const [material, setMaterial] = useState(MATERIALS_BY_TECH['FDM'][0].id)
-  const [color, setColor] = useState(COLORS_BY_TECH['FDM'][0].id)
-  const [surfaceFinish, setSurfaceFinish] = useState(SURFACE_FINISH_BY_TECH['FDM'][0].id)
+  const [material, setMaterial] = useState(MATERIALS[0].id)
+  const [color, setColor] = useState(COLORS[0].id)
   const [qty, setQty] = useState(1)
   const [infill, setInfill] = useState(20)
   const [remark, setRemark] = useState('')
   const [configuredPrice, setConfiguredPrice] = useState(null)
-
-  // When tech changes, reset dependent fields
-  useEffect(() => {
-    setMaterial(MATERIALS_BY_TECH[technology][0].id)
-    setColor(COLORS_BY_TECH[technology][0].id)
-    setSurfaceFinish(SURFACE_FINISH_BY_TECH[technology][0].id)
-  }, [technology])
+  const [estimatedGrams, setEstimatedGrams] = useState(0)
+  const [estimatedTime, setEstimatedTime] = useState(0)
 
   // Recalculate price whenever options change
   useEffect(() => {
-    if (!uploadResult) return
-    const tech = TECH_OPTIONS.find(t => t.id === technology)
-    const mat  = (MATERIALS_BY_TECH[technology] || []).find(m => m.id === material)
-    const surf = (SURFACE_FINISH_BY_TECH[technology] || []).find(s => s.id === surfaceFinish)
-    if (!tech || !mat) return
+    if (!uploadResult || !uploadResult.volume && !uploadResult.boundingBox) return
+    const mat  = MATERIALS.find(m => m.id === material)
+    if (!mat) return
     
-    // Base calculation: adjust grams based on infill (backend uses 15% as base)
-    const infillRatio = infill / 15
-    const baseAdjustedPrice = uploadResult.price * infillRatio
+    // Weight = Volume(cm³) × Density × Infill
+    // Note: uploadResult.volume is in mm³
+    const volumeCm3 = uploadResult.volume / 1000.0;
+    const finalInfill = infill / 100.0;
+    const calculatedGrams = volumeCm3 * mat.density * finalInfill;
     
-    const baseUSD  = baseAdjustedPrice / USD_TO_INR
-    const computed = (baseUSD * mat.priceMultiplier + (surf?.priceAdd || 0)) * qty * USD_TO_INR
-    setConfiguredPrice(Math.max(computed, tech.basePrice * USD_TO_INR * qty))
-  }, [technology, material, surfaceFinish, qty, infill, uploadResult])
+    // Time Estimate (hours) = (Grams * 0.05) + (Height * 0.005)
+    const heightMm = uploadResult.boundingBox?.height || 0;
+    const calcTimeHours = (calculatedGrams * 0.05) + (heightMm * 0.005);
+    
+    // Calculate Price
+    const costPerGram = 1.0; // ₹1 per gram
+    const costPerHour = 30.0;
+    const profitMultiplier = 1.5;
+    
+    const singlePrice = ((calculatedGrams * costPerGram) + (calcTimeHours * costPerHour)) * profitMultiplier;
+    
+    setEstimatedGrams(calculatedGrams);
+    setEstimatedTime(calcTimeHours);
+    setConfiguredPrice(singlePrice * qty);
+  }, [material, qty, infill, uploadResult])
 
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0]
@@ -240,7 +148,7 @@ export default function Upload() {
           amount: Math.round((configuredPrice || uploadResult.price) * 100),
           currency: 'INR',
           name: 'Tesseract Labs',
-          description: `3D Print: ${uploadResult.filename} | Tech: ${technology} | Qty: ${qty}`,
+          description: `3D Print: ${uploadResult.filename} | ${material.toUpperCase()} | Qty: ${qty}`,
           order_id: orderData.data.razorpayOrderId,
           handler: async function (response) {
             try {
@@ -273,21 +181,18 @@ export default function Upload() {
 
   const handleWhatsApp = async () => {
     if (!uploadResult) return
-    const techLabel  = TECH_OPTIONS.find(t => t.id === technology)?.label || technology
-    const matLabel   = (MATERIALS_BY_TECH[technology] || []).find(m => m.id === material)?.label || material
-    const colLabel   = (COLORS_BY_TECH[technology] || []).find(c => c.id === color)?.label || color
-    const surfLabel  = (SURFACE_FINISH_BY_TECH[technology] || []).find(s => s.id === surfaceFinish)?.label || surfaceFinish
+    const matLabel   = MATERIALS.find(m => m.id === material)?.label || material
+    const colLabel   = COLORS.find(c => c.id === color)?.label || color
     const displayPrice = configuredPrice || uploadResult.price
     const message = encodeURIComponent(
-      `🖨️ 3D Print Order Request\n\nFile: ${uploadResult.filename}\nTechnology: ${techLabel}\nMaterial: ${matLabel}\nColor: ${colLabel}\nInfill: ${infill}%\nSurface Finish: ${surfLabel}\nQuantity: ${qty}\nEstimated Price: ₹${displayPrice.toFixed(2)}\n${remark ? `\nRemark: ${remark}` : ''}\n\nVolume: ${uploadResult.volume.toFixed(2)} mm³\nWeight: ${(uploadResult.grams * (infill / 15)).toFixed(2)} g`
+      `🖨️ 3D Print Order Request\n\nFile: ${uploadResult.filename}\nMaterial: ${matLabel}\nColor: ${colLabel}\nInfill: ${infill}%\nQuantity: ${qty}\nEstimated Price: ₹${displayPrice.toFixed(2)}\n${remark ? `\nRemark: ${remark}` : ''}\n\nVolume: ${uploadResult.volume.toFixed(2)} mm³\nWeight: ${estimatedGrams.toFixed(2)} g`
     )
     const whatsappUrl = `https://wa.me/${import.meta.env.VITE_WHATSAPP_NUMBER || '917069315037'}?text=${message}`
     window.open(whatsappUrl, '_blank')
   }
 
   const displayPrice = configuredPrice || uploadResult?.price
-  const selectedTech = TECH_OPTIONS.find(t => t.id === technology)
-  const selectedColor = (COLORS_BY_TECH[technology] || []).find(c => c.id === color)
+  const selectedColor = COLORS.find(c => c.id === color)
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -314,11 +219,15 @@ export default function Upload() {
             {error && <div className="mt-4 p-4 bg-red-500/20 border border-red-500 rounded-lg text-red-400 text-sm">{error}</div>}
           </div>
 
-          {/* 3D Preview */}
           {file && (
             <div className="card">
               <h2 className="text-xl font-bold mb-4">3D Preview</h2>
-              <ModelViewer file={file} onError={setError} />
+              <ModelViewer 
+                file={file} 
+                convertedGlbUrl={uploadResult?.convertedGlbUrl} 
+                onError={setError}
+                uploadComplete={!!uploadResult}
+              />
               <div className="mt-3 text-xs text-gray-400 flex items-start space-x-2">
                 <FaInfoCircle className="mt-0.5 flex-shrink-0" />
                 <p>Rotate: left-drag · Zoom: scroll · Pan: right-drag</p>
@@ -333,43 +242,13 @@ export default function Upload() {
           <div className="card">
             <h2 className="text-xl font-bold mb-5">② Configure Print Options</h2>
 
-            {/* Technology Row */}
-            <div className="mb-5">
-              <label className="block text-xs text-gray-400 mb-2 font-semibold tracking-wide uppercase">3D Technology</label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {TECH_OPTIONS.map(tech => (
-                  <button
-                    key={tech.id}
-                    type="button"
-                    disabled={tech.disabled}
-                    onClick={() => setTechnology(tech.id)}
-                    title={tech.desc}
-                    className={`px-3 py-2 rounded-lg text-sm font-medium border transition-all text-left ${
-                      technology === tech.id
-                        ? 'border-accent-primary bg-accent-primary/15 text-accent-primary'
-                        : tech.disabled
-                        ? 'border-dark-border bg-dark-bg/50 text-gray-600 cursor-not-allowed opacity-60'
-                        : 'border-dark-border bg-dark-tertiary hover:border-accent-primary/50 text-gray-300'
-                    }`}
-                  >
-                    <span className="font-bold flex items-center justify-between">
-                      {tech.id}
-                      {tech.disabled && <span className="text-[10px] bg-dark-border px-1.5 py-0.5 rounded ml-1 text-gray-500">SOON</span>}
-                    </span>
-                    <span className="block text-xs text-gray-400 mt-0.5 truncate">{tech.disabled ? 'Coming Soon' : tech.desc.split(',')[0]}</span>
-                  </button>
-                ))}
-              </div>
-              {selectedTech && (
-                <p className="mt-2 text-xs text-gray-500">{selectedTech.desc} · From ${selectedTech.basePrice.toFixed(2)}</p>
-              )}
-            </div>
+
 
             <div className="grid gap-4">
               {/* Material */}
               <SelectDropdown
                 label="Material"
-                options={MATERIALS_BY_TECH[technology] || []}
+                options={MATERIALS}
                 value={material}
                 onChange={setMaterial}
               />
@@ -378,7 +257,7 @@ export default function Upload() {
               <div>
                 <label className="block text-xs text-gray-400 mb-2 font-semibold tracking-wide uppercase">Color</label>
                 <div className="flex flex-wrap gap-2">
-                  {(COLORS_BY_TECH[technology] || []).map(col => (
+                  {COLORS.map(col => (
                     <button
                       key={col.id}
                       type="button"
@@ -404,19 +283,7 @@ export default function Upload() {
                 )}
               </div>
 
-              {/* Surface Finish */}
-              <SelectDropdown
-                label="Surface Finish"
-                options={SURFACE_FINISH_BY_TECH[technology] || []}
-                value={surfaceFinish}
-                onChange={setSurfaceFinish}
-                renderOption={(opt) => opt && (
-                  <span className="flex items-center justify-between w-full">
-                    <span>{opt.label}</span>
-                    {opt.priceAdd > 0 && <span className="text-xs text-accent-primary ml-2">+${opt.priceAdd.toFixed(2)}</span>}
-                  </span>
-                )}
-              />
+
 
               {/* Quantity */}
               <div>
@@ -495,12 +362,11 @@ export default function Upload() {
 
                 {/* Spec summary */}
                 <div className="grid grid-cols-2 gap-2 text-sm mb-4">
-                  <SpecBox label="Technology" value={technology} />
-                  <SpecBox label="Material"   value={(MATERIALS_BY_TECH[technology] || []).find(m => m.id === material)?.label} />
+                  <SpecBox label="Material"   value={MATERIALS.find(m => m.id === material)?.label} />
                   <SpecBox label="Color"      value={selectedColor?.label} />
-                  <SpecBox label="Surface"    value={(SURFACE_FINISH_BY_TECH[technology] || []).find(s => s.id === surfaceFinish)?.label} />
                   <SpecBox label="Volume"     value={`${uploadResult.volume.toFixed(1)} mm³`} />
-                  <SpecBox label="Weight"     value={`${(uploadResult.grams * (infill / 15)).toFixed(2)} g`} />
+                  <SpecBox label="Weight"     value={`${estimatedGrams.toFixed(2)} g`} />
+                  <SpecBox label="Time"       value={`${estimatedTime.toFixed(1)} hrs`} />
                   <SpecBox label="Infill"     value={`${infill}%`} />
                   {uploadResult.boundingBox && <>
                     <SpecBox label="Width"  value={`${uploadResult.boundingBox.width.toFixed(1)} mm`} />

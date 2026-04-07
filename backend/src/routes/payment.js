@@ -16,7 +16,7 @@ const razorpay = new Razorpay({
  */
 router.post('/razorpay/create-order', async (req, res) => {
     try {
-        const { orderId } = req.body;
+        const { orderId, configuredPrice, options: printOptions } = req.body;
 
         if (!orderId) {
             return res.status(400).json({
@@ -34,6 +34,17 @@ router.post('/razorpay/create-order', async (req, res) => {
             });
         }
 
+        // Update the order with dynamic pricing and options configured by the user
+        if (configuredPrice) {
+            order.price = configuredPrice;
+        }
+        if (printOptions) {
+            order.material = printOptions.material;
+            order.color = printOptions.color;
+            order.infill = printOptions.infill;
+            order.qty = printOptions.qty;
+        }
+
         // Create Razorpay order
         const options = {
             amount: Math.round(order.price * 100), // amount in paise
@@ -43,7 +54,9 @@ router.post('/razorpay/create-order', async (req, res) => {
                 orderId: order._id.toString(),
                 filename: order.originalName,
                 volume: order.volume.toString(),
-                grams: order.grams.toString()
+                grams: order.grams.toString(),
+                qty: order.qty?.toString() || "1",
+                material: order.material || "PLA"
             }
         };
 

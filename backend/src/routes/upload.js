@@ -85,33 +85,41 @@ router.post('/', upload.single('file'), async (req, res) => {
         const formData = new FormData();
         formData.append('file', fs.createReadStream(req.file.path));
 
-        console.log('🔄 Sending to Python service:', PYTHON_SERVICE_URL);
+        console.log('🔄 Sending to Python service:', PYTHON_SERVICE_URL, 'file:', req.file.originalname);
+        const startTime = Date.now();
 
         const pythonResponse = await axios.post(
             `${PYTHON_SERVICE_URL}/analyze`,
             formData,
             {
                 headers: formData.getHeaders(),
-                timeout: 30000 // 30 second timeout
+                timeout: 180000 // 180s — STEP files need cascadio conversion time
             }
-        );
+        ).catch(async (pErr) => {
+            const elapsed = (Date.now() - startTime) / 1000;
+            console.error(`❌ Python service error after ${elapsed}s:`, pErr.message);
+            throw pErr;
+        });
+
+        const elapsed = (Date.now() - startTime) / 1000;
+        console.log(`✅ Python service responded in ${elapsed}s:`, pythonResponse.data?.format);
 
         const analysisData = pythonResponse.data;
         console.log('✅ Analysis complete:', analysisData);
 
-        // Calculate machine time and price
-        const machineTimeHours = estimateMachineTime(
+        // Calculate proxy machine time and price
+        const machineTimeHours = analysisData.estimated_time_hours || estimateMachineTime(
             analysisData.volume,
-            analysisData.estimated_grams
+            analysisData.grams || 0
         );
-        const price = calculatePrice(analysisData.estimated_grams, machineTimeHours);
+        const price = analysisData.price || calculatePrice(analysisData.grams || 0, machineTimeHours);
 
         // Create order in database
         const order = new Order({
             filename: req.file.filename,
             originalName: req.file.originalname,
             volume: analysisData.volume,
-            grams: analysisData.estimated_grams,
+            grams: analysisData.grams,
             price: price,
             boundingBox: analysisData.bounding_box,
             surfaceArea: analysisData.surface_area,
@@ -124,6 +132,26 @@ router.post('/', upload.single('file'), async (req, res) => {
         await order.save();
         console.log('💾 Order saved:', order._id);
 
+        // Trigger background Celery slicing task
+        try {
+            console.log('🚀 Triggering background slicing job...');
+            const sliceFormData = new FormData();
+            sliceFormData.append('file', fs.createReadStream(req.file.path));
+            sliceFormData.append('orderId', order._id.toString());
+            sliceFormData.append('infill', '20'); // Use default infill for preliminary slicing
+            sliceFormData.append('material', 'pla'); // default material
+
+            axios.post(
+                `${PYTHON_SERVICE_URL}/slice`,
+                sliceFormData,
+                { headers: sliceFormData.getHeaders(), timeout: 10000 }
+            ).catch(err => {
+                console.error('Slicing trigger error:', err.message);
+            });
+        } catch (sliceErr) {
+            console.error('Failed to dispatch slicing job:', sliceErr.message);
+        }
+
         // Return response
         res.json({
             success: true,
@@ -131,15 +159,16 @@ router.post('/', upload.single('file'), async (req, res) => {
                 orderId: order._id,
                 filename: req.file.originalname,
                 volume: analysisData.volume,
-                grams: analysisData.estimated_grams,
+                grams: analysisData.grams,
                 price: price,
                 boundingBox: analysisData.bounding_box,
                 machineTimeEstimate: machineTimeHours,
                 isWatertight: analysisData.is_watertight,
+                convertedGlbUrl: analysisData.converted_glb_url,
                 breakdown: {
-                    materialCost: Math.round(analysisData.estimated_grams * COST_PER_GRAM * 100) / 100,
+                    materialCost: Math.round((analysisData.grams || 0) * COST_PER_GRAM * 100) / 100,
                     machineCost: Math.round(machineTimeHours * HOURLY_RATE * 100) / 100,
-                    handlingFee: Math.round((analysisData.estimated_grams * COST_PER_GRAM + machineTimeHours * HOURLY_RATE) * 0.1 * 100) / 100
+                    handlingFee: Math.round(((analysisData.grams || 0) * COST_PER_GRAM + machineTimeHours * HOURLY_RATE) * 0.1 * 100) / 100
                 }
             }
         });
