@@ -1,6 +1,4 @@
-# 3D Printing Farm Web Application
-
-A complete production-ready web application for managing a 3D printing farm with STL file upload, price calculation, payment integration, and order management.
+# Tesseract Labs Application
 
 ## 🚀 Tech Stack
 
